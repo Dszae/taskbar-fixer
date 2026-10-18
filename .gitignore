@@ -1,0 +1,37 @@
+# Visual Studio / C++ artifacts
+.vs/
+*.obj
+*.exe
+*.pdb
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.tlog
+*.idb
+*.manifest
+
+# Windhawk temporary build folders
+build/
+bin/
+obj/
+out/
+dist/
+
+# OS specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Editor settings
+.vscode/
+.idea/
+*.swp
+*.bak
+*~

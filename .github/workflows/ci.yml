@@ -1,0 +1,32 @@
+name: Mod Integrity & Linter Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Mod Header & Metadata
+        shell: pwsh
+        run: |
+          $modFile = "windows11-app-specific-taskbar-hider.wh.cpp"
+          if (-not (Test-Path $modFile)) {
+              Write-Error "Mod file $modFile does not exist!"
+              exit 1
+          }
+          $content = Get-Content $modFile -Raw
+          $requiredTags = @("// ==WindhawkMod==", "// @id", "// @name", "// @include         explorer.exe", "// ==/WindhawkMod==")
+          foreach ($tag in $requiredTags) {
+              if (-not ($content -match [regex]::Escape($tag))) {
+                  Write-Error "Missing required Windhawk tag: $tag"
+                  exit 1
+              }
+          }
+          Write-Host "Mod structure validation passed successfully."
