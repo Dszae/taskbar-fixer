@@ -405,3 +405,4 @@ void Wh_ModSettingsChanged() {
     LoadSettings();
     UpdateTaskbarState();
 }
+

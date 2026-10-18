@@ -39,3 +39,4 @@ Windhawk makes developing and testing mods straightforward without needing a hea
 3. Test your modifications thoroughly in Windhawk.
 4. Commit your changes: `git commit -m "feat: enhance work area calculation on secondary monitors"`.
 5. Push to your branch and open a Pull Request.
+

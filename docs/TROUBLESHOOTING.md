@@ -82,3 +82,4 @@ If you see no log outputs, verify that the mod is compiled and enabled.
 2. Find **Windows 11 App Specific Taskbar Hider** in your installed mods list.
 3. Toggle the switch to **Disabled** or click **Uninstall**.
 4. The mod will automatically restore your taskbar (`ShowWindow(SW_SHOW)`) and reset the desktop work area to default. No reboot or explorer restart is required!
+

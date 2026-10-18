@@ -124,3 +124,4 @@ void AdjustWorkArea(bool useFullScreen) {
 - **Hook Performance**: The API hooks execute in nanoseconds (a pointer check and an atomic boolean comparison). There is **zero measurable CPU overhead** during everyday usage.
 - **Process Polling**: A lightweight background thread checks foreground/process state every ~300ms using `QueryFullProcessImageNameW` or snapshot lookups.
 - **Locking**: Mod settings are protected by `CRITICAL_SECTION g_settingsLock` to prevent data races during dynamic settings reconfiguration.
+

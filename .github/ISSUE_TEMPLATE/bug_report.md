@@ -35,3 +35,4 @@ A clear description of what you expected to happen.
 ```text
 Paste logs from the Windhawk Logs tab here (if applicable)
 ```
+
