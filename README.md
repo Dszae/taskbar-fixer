@@ -208,7 +208,6 @@ Contributions, preset suggestions, and bug reports are warmly welcome!
 
 ## 📜 Credits & License
 
-- Original mod authored by **KWWDCoding** ([Website](https://www.kwwd.co.uk)).
 - Maintained & packaged by **[Dszae](https://github.com/Dszae)**.
 - Licensed under the **[MIT License](LICENSE)**.
 
