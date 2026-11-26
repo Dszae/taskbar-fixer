@@ -84,12 +84,14 @@ Blocks a hidden taskbar from taking the focus away from the active application.
 
 ## 4. Full Screen Work Area (`SPI_SETWORKAREA`)
 
-Hiding the taskbar window alone leaves a gap at the bottom of the screen where maximized windows stop. When hiding starts, the mod:
+Hiding the taskbar window alone leaves a gap at the bottom of the screen where maximized windows stop. When hiding starts, for each monitor that has a taskbar, the mod:
 
-1. Saves the current work area of each monitor whose work area is smaller than the monitor.
-2. Sets that monitor's work area to the full monitor rectangle with `SPI_SETWORKAREA` (`SPIF_SENDCHANGE`, nothing is written to the user profile).
+1. Finds the edge of the monitor the taskbar is docked to.
+2. Saves the monitor's current work area (only the first time).
+3. Extends the work area over that edge with `SPI_SETWORKAREA`, without `SPIF_SENDCHANGE`. Space reserved by other appbars (docks, toolbars) on other edges is kept.
+4. Broadcasts `WM_SETTINGCHANGE` once with `SendMessageTimeout(SMTO_ABORTIFHUNG, 100 ms)`, so a hung app can't block the mod. `SPIF_SENDCHANGE` would wait for every top-level window.
 
-While hidden, the work areas are re-checked every 5 seconds, so a work area reset by a display change, or a newly connected monitor, is expanded again. The originally saved work area is kept.
+While hidden, the work areas are re-checked every second, so a work area reset by a display change, or a newly connected monitor, is extended again. The originally saved work area is kept.
 
 When the taskbar is shown again, or the mod is disabled, the saved work areas are restored. A saved work area is skipped if that monitor no longer exists with the same size, since Windows recalculates the work area after display changes anyway.
 
@@ -99,7 +101,8 @@ When the taskbar is shown again, or the mod is disabled, the saved work areas ar
 
 - **Worker thread**: A single worker thread owns all state changes. It listens for `EVENT_SYSTEM_FOREGROUND`, so switching apps updates the state instantly, and runs a light check every 500 ms (process list in "running" mode, re-hiding a recreated taskbar).
 - **Alt+Tab / Task View**: While these shell windows have the focus, the current state is kept, so switching between target apps doesn't flash the taskbar.
-- **No deadlocks**: The taskbar windows belong to explorer's UI thread, so the worker thread uses `ShowWindowAsync`, which never waits for that thread.
-- **Re-entrancy**: Changing the work area broadcasts `WM_SETTINGCHANGE`, during which other events can be delivered. Nested updates are deferred until the current update finishes.
+- **No deadlocks**: The taskbar windows belong to explorer's UI thread, so the worker thread uses `ShowWindowAsync`, which never waits for that thread. Only taskbars the mod hid itself are shown again.
+- **Single owner**: `@include explorer.exe` loads the mod into every Explorer process. Only the process that owns the taskbar acts; the others stay idle.
+- **Re-entrancy**: Broadcasting `WM_SETTINGCHANGE` waits for other windows, during which other events can be delivered. Nested updates are deferred until the current update finishes.
 - **Hook cost**: While the taskbar isn't hidden, each hook only reads an atomic flag. While hidden, it also checks the window class.
 - **Locking**: Settings are protected by `g_settingsLock`, since Windhawk calls `Wh_ModSettingsChanged` on a different thread.

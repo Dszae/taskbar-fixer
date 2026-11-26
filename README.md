@@ -176,9 +176,9 @@ The taskbar windows use the window classes `Shell_TrayWnd` (primary monitor) and
 3. **`SetForegroundWindow_Hook`**:
    Prevents the hidden taskbar from taking the focus from your app.
 4. **Work Area Adjustment**:
-   Saves each monitor's work area, then calls `SystemParametersInfo(SPI_SETWORKAREA, ...)` to expand it to the full monitor, so maximized windows fill the screen. The saved work area is restored when the taskbar comes back or the mod is disabled.
+   Saves each monitor's work area, then calls `SystemParametersInfo(SPI_SETWORKAREA, ...)` to extend it over the taskbar's edge of the screen, so maximized windows fill that space. Space reserved by other docked toolbars is kept. The saved work area is restored when the taskbar comes back or the mod is disabled.
 5. **Focus Tracking**:
-   A foreground-window event (`EVENT_SYSTEM_FOREGROUND`) updates the state instantly when you switch apps. Alt+Tab and Task View are ignored, so switching between target apps doesn't flash the taskbar. A light check twice a second handles the "running" mode and re-hides the taskbar if Windows recreates it.
+   A foreground-window event (`EVENT_SYSTEM_FOREGROUND`) updates the state instantly when you switch apps. Alt+Tab and Task View are ignored, so switching between target apps doesn't flash the taskbar. A light check twice a second handles the "running" mode and re-hides the taskbar if Windows recreates it. Only the Explorer process that owns the taskbar does any of this; other Explorer processes (e.g. separate folder windows) stay idle.
 
 For the full technical breakdown and memory diagrams, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -193,7 +193,7 @@ Yes! Pressing the <b>Windows Key</b> opens the Start Menu as usual. With "Requir
 
 <details>
 <summary><b>Does this work on multi-monitor setups?</b></summary>
-Yes. The mod hides the taskbar on every monitor (<code>Shell_TrayWnd</code> and <code>Shell_SecondaryTrayWnd</code>) and expands the work area of every monitor.
+Yes. The mod hides the taskbar on every monitor (<code>Shell_TrayWnd</code> and <code>Shell_SecondaryTrayWnd</code>) and extends the work area over the taskbar's edge on each monitor that has one.
 </details>
 
 <details>
