@@ -86,6 +86,9 @@ Download and install the free, open-source Windows customization engine **Windha
 👉 **[Download Windhawk from windhawk.net](https://windhawk.net/)**
 
 ### Step 2: Add the Mod
+> [!NOTE]
+> The mod has been submitted to the official Windhawk mod collection ([pull request #7991](https://github.com/ramensoftware/windhawk-mods/pull/7991)). Once it's accepted, you can install it directly from Windhawk's **Explore** page by searching for **App Specific Taskbar Hider**. Until then, add it as a local mod:
+
 1. Open the **Windhawk** application.
 2. Click the three-dots menu (**`...`**) in the top right corner and select **Advanced** > **Create Local Mod**.
 3. In the mod source editor, copy and paste the entire contents of [`windows11-app-specific-taskbar-hider.wh.cpp`](windows11-app-specific-taskbar-hider.wh.cpp).
@@ -164,16 +167,18 @@ targetProcesses:
 
 ## 🔬 How It Works Under the Hood
 
-When Windows Shell initializes, the taskbar window is managed under the window class `Shell_TrayWnd`.
+The taskbar windows use the window classes `Shell_TrayWnd` (primary monitor) and `Shell_SecondaryTrayWnd` (other monitors).
 
-1. **`Hook_ShowWindow`**:
-   Intercepts calls to `ShowWindow`. If `g_forceHidden` is active and the target window is `Shell_TrayWnd`, calls with `SW_SHOW`, `SW_SHOWNA`, `SW_SHOWNORMAL`, or `SW_RESTORE` are neutralized (`return TRUE`).
-2. **`Hook_SetWindowPos`**:
-   Intercepts taskbar repositioning. The `SWP_SHOWWINDOW` flag is stripped, and `SWP_HIDEWINDOW | SWP_NOACTIVATE` is injected to prevent the window manager from forcing visibility.
-3. **`Hook_SetForegroundWindow`**:
-   Prevents the hidden taskbar from stealing input focus if an invisible hit occurs.
-4. **Desktop Work Area Adjustment**:
-   Calls `SystemParametersInfo(SPI_SETWORKAREA, ...)` to expand the usable desktop workspace, ensuring maximized windows occupy 100% of the display.
+1. **`ShowWindow_Hook`**:
+   Intercepts calls to `ShowWindow`. While `g_forceHidden` is active, any call on a taskbar window other than `SW_HIDE` is ignored.
+2. **`SetWindowPos_Hook`**:
+   Intercepts taskbar repositioning. The `SWP_SHOWWINDOW` flag is stripped, and `SWP_HIDEWINDOW | SWP_NOACTIVATE` is added so the taskbar can't become visible this way.
+3. **`SetForegroundWindow_Hook`**:
+   Prevents the hidden taskbar from taking the focus from your app.
+4. **Work Area Adjustment**:
+   Saves each monitor's work area, then calls `SystemParametersInfo(SPI_SETWORKAREA, ...)` to expand it to the full monitor, so maximized windows fill the screen. The saved work area is restored when the taskbar comes back or the mod is disabled.
+5. **Focus Tracking**:
+   A foreground-window event (`EVENT_SYSTEM_FOREGROUND`) updates the state instantly when you switch apps. Alt+Tab and Task View are ignored, so switching between target apps doesn't flash the taskbar. A light check twice a second handles the "running" mode and re-hides the taskbar if Windows recreates it.
 
 For the full technical breakdown and memory diagrams, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -183,12 +188,12 @@ For the full technical breakdown and memory diagrams, see [docs/ARCHITECTURE.md]
 
 <details>
 <summary><b>Can I still open the Start Menu?</b></summary>
-Yes! Tapping the <b>Windows Key</b> on your keyboard sends an explicit Shell invocation that opens the Start Menu over your app even when the taskbar is hidden.
+Yes! Pressing the <b>Windows Key</b> opens the Start Menu as usual. With "Require focus" enabled, the Start Menu takes the focus from your app, so the taskbar is shown while it's open and hidden again when you return to your app.
 </details>
 
 <details>
 <summary><b>Does this work on multi-monitor setups?</b></summary>
-Yes. The mod controls <code>Shell_TrayWnd</code> and dynamically updates the primary monitor work area.
+Yes. The mod hides the taskbar on every monitor (<code>Shell_TrayWnd</code> and <code>Shell_SecondaryTrayWnd</code>) and expands the work area of every monitor.
 </details>
 
 <details>

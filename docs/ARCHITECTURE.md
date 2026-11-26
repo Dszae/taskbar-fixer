@@ -1,6 +1,6 @@
 # Architecture & Technical Deep Dive
 
-This document provides an in-depth breakdown of how the **Windows 11 App Specific Taskbar Hider** mod operates inside the Windows Shell (`explorer.exe`), why traditional autohide workarounds fail, and how inline Win32 API hooks achieve zero-latency hover suppression.
+This document provides an in-depth breakdown of how the **App Specific Taskbar Hider** mod operates inside the Windows Shell (`explorer.exe`), why traditional autohide workarounds fail, and how inline Win32 API hooks achieve zero-latency hover suppression.
 
 ---
 
@@ -36,20 +36,20 @@ Third-party tools and AutoHotkey scripts usually poll the active process and iss
 
 Rather than fighting `explorer.exe` from an external process, this mod injects directly into `explorer.exe` through [Windhawk](https://windhawk.net/) and hooks the exact Win32 API calls that the Shell uses to reveal and activate the taskbar.
 
+
 ```mermaid
 flowchart TD
     subgraph Windhawk Mod in explorer.exe
-        A[Polling Thread / Process Monitor] -->|Updates state| B(std::atomic<bool> g_forceHidden)
-        
+        A[Worker thread: foreground event + 500 ms check] -->|Updates state| B(std::atomic<bool> g_forceHidden)
+
         C[Windows Shell Event / Cursor Edge Trigger] --> D{Shell calls ShowWindow / SetWindowPos}
-        
-        D --> E{Hook_ShowWindow / Hook_SetWindowPos}
-        
+
+        D --> E{ShowWindow_Hook / SetWindowPos_Hook}
+
         E -->|g_forceHidden == false| F[Pass through to original Win32 API]
-        E -->|g_forceHidden == true AND hWnd == Shell_TrayWnd| G[Block Reveal / Strip SWP_SHOWWINDOW]
-        
-        G --> H[Return TRUE / Pretend Succeeded]
-        H --> I[Taskbar stays completely hidden & silent]
+        E -->|g_forceHidden == true AND window is a taskbar| G[Block Reveal / Strip SWP_SHOWWINDOW]
+
+        G --> I[Taskbar stays hidden]
     end
 ```
 
@@ -57,71 +57,49 @@ flowchart TD
 
 ## 3. Intercepted Win32 APIs
 
+All hooks check the window class, so they cover the primary taskbar (`Shell_TrayWnd`) and the taskbars on other monitors (`Shell_SecondaryTrayWnd`), including taskbars Windows recreates later.
+
 ### A. `ShowWindow(HWND hWnd, int nCmdShow)`
-* **Target Window**: `Shell_TrayWnd` (the top-level window class of the Windows taskbar).
-* **Behavior when `g_forceHidden` is active**:
-  When the Shell tries to execute `SW_SHOW`, `SW_SHOWNA`, `SW_SHOWNORMAL`, `SW_SHOWNOACTIVATE`, or `SW_RESTORE`:
-  ```cpp
-  if (g_forceHidden && hWnd == g_taskbarHwnd) {
-      switch (nCmdShow) {
-          case SW_SHOW:
-          case SW_SHOWNA:
-          case SW_SHOWNORMAL:
-          case SW_SHOWNOACTIVATE:
-          case SW_RESTORE:
-              return TRUE; // Pretend it worked, do nothing
-      }
-  }
-  ```
-  The call returns `TRUE` immediately without modifying the window state.
-
-### B. `SetWindowPos(...)`
-* Windows often restores or moves the taskbar using `SetWindowPos` instead of `ShowWindow`.
-* **Behavior when `g_forceHidden` is active**:
-  ```cpp
-  if (g_forceHidden && hWnd == g_taskbarHwnd) {
-      uFlags &= ~SWP_SHOWWINDOW;
-      uFlags |= SWP_NOACTIVATE | SWP_HIDEWINDOW;
-  }
-  return g_origSetWindowPos(hWnd, hWndInsertAfter, X, Y, cx, cy, uFlags);
-  ```
-  This strips any show request and enforces `SWP_HIDEWINDOW | SWP_NOACTIVATE`, ensuring the taskbar cannot sneak in through position changes.
-
-### C. `SetForegroundWindow(HWND hWnd)`
-* Blocks the taskbar window from taking focus away from the active application while `g_forceHidden` is `true`.
-
----
-
-## 4. Fullscreen Work Area Expansion (`SPI_SETWORKAREA`)
-
-Simply hiding the taskbar window leaves a gap at the bottom of the screen where maximized windows stop. To grant your application **100% true screen estate**:
-
+While `g_forceHidden` is active, any call on a taskbar window other than `SW_HIDE` is ignored:
 ```cpp
-void AdjustWorkArea(bool useFullScreen) {
-    MONITORINFO mi = { sizeof(mi) };
-    HMONITOR hMonitor = MonitorFromWindow(NULL, MONITOR_DEFAULTTOPRIMARY);
-
-    if (GetMonitorInfo(hMonitor, &mi)) {
-        RECT rcWork = mi.rcMonitor;
-
-        if (!useFullScreen) {
-            SystemParametersInfo(SPI_GETWORKAREA, 0, &rcWork, 0);
-        } else {
-            rcWork = mi.rcMonitor;
-            SystemParametersInfo(SPI_SETWORKAREA, 0, &rcWork, SPIF_SENDCHANGE | SPIF_UPDATEINIFILE);
-        }
-    }
+if (g_forceHidden && nCmdShow != SW_HIDE && IsTaskbarWindow(hWnd)) {
+    return FALSE;  // Previous state: hidden
 }
 ```
 
-- When the target app is focused, the desktop work area (`rcWork`) expands to match `rcMonitor`.
-- When switching back to desktop or an unlisted app, the original desktop work area is restored.
+### B. `SetWindowPos(...)`
+Windows often moves or restores the taskbar using `SetWindowPos` instead of `ShowWindow`:
+```cpp
+if (g_forceHidden && IsTaskbarWindow(hWnd)) {
+    uFlags &= ~SWP_SHOWWINDOW;
+    uFlags |= SWP_NOACTIVATE | SWP_HIDEWINDOW;
+}
+```
+This strips any show request, so the taskbar can't become visible through position changes.
+
+### C. `SetForegroundWindow(HWND hWnd)`
+Blocks a hidden taskbar from taking the focus away from the active application.
 
 ---
 
-## 5. Thread Safety & Performance
+## 4. Full Screen Work Area (`SPI_SETWORKAREA`)
 
-- **Hook Performance**: The API hooks execute in nanoseconds (a pointer check and an atomic boolean comparison). There is **zero measurable CPU overhead** during everyday usage.
-- **Process Polling**: A lightweight background thread checks foreground/process state every ~300ms using `QueryFullProcessImageNameW` or snapshot lookups.
-- **Locking**: Mod settings are protected by `CRITICAL_SECTION g_settingsLock` to prevent data races during dynamic settings reconfiguration.
+Hiding the taskbar window alone leaves a gap at the bottom of the screen where maximized windows stop. When hiding starts, the mod:
 
+1. Saves the current work area of each monitor whose work area is smaller than the monitor.
+2. Sets that monitor's work area to the full monitor rectangle with `SPI_SETWORKAREA` (`SPIF_SENDCHANGE`, nothing is written to the user profile).
+
+While hidden, the work areas are re-checked every 5 seconds, so a work area reset by a display change, or a newly connected monitor, is expanded again. The originally saved work area is kept.
+
+When the taskbar is shown again, or the mod is disabled, the saved work areas are restored. A saved work area is skipped if that monitor no longer exists with the same size, since Windows recalculates the work area after display changes anyway.
+
+---
+
+## 5. Threading & Performance
+
+- **Worker thread**: A single worker thread owns all state changes. It listens for `EVENT_SYSTEM_FOREGROUND`, so switching apps updates the state instantly, and runs a light check every 500 ms (process list in "running" mode, re-hiding a recreated taskbar).
+- **Alt+Tab / Task View**: While these shell windows have the focus, the current state is kept, so switching between target apps doesn't flash the taskbar.
+- **No deadlocks**: The taskbar windows belong to explorer's UI thread, so the worker thread uses `ShowWindowAsync`, which never waits for that thread.
+- **Re-entrancy**: Changing the work area broadcasts `WM_SETTINGCHANGE`, during which other events can be delivered. Nested updates are deferred until the current update finishes.
+- **Hook cost**: While the taskbar isn't hidden, each hook only reads an atomic flag. While hidden, it also checks the window class.
+- **Locking**: Settings are protected by `g_settingsLock`, since Windhawk calls `Wh_ModSettingsChanged` on a different thread.

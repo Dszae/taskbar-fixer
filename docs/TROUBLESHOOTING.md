@@ -1,6 +1,6 @@
 # Troubleshooting & FAQ
 
-This guide addresses common issues, diagnostic steps, and tips for configuring the **Windows 11 App Specific Taskbar Hider** mod.
+This guide addresses common issues, diagnostic steps, and tips for configuring the **App Specific Taskbar Hider** mod.
 
 ---
 
@@ -68,7 +68,6 @@ Windhawk includes an integrated logger that captures all `Wh_Log` events:
 3. Switch to the **Logs** tab.
 4. You will see real-time outputs such as:
    ```text
-   Initializing Windows 11 App Specific Taskbar Hider
    Condition changed, hiding taskbar
    Condition changed, showing taskbar
    ```
@@ -79,7 +78,7 @@ If you see no log outputs, verify that the mod is compiled and enabled.
 ## 5. How to Revert or Uninstall
 
 1. Open **Windhawk**.
-2. Find **Windows 11 App Specific Taskbar Hider** in your installed mods list.
+2. Find **App Specific Taskbar Hider** in your installed mods list.
 3. Toggle the switch to **Disabled** or click **Uninstall**.
-4. The mod will automatically restore your taskbar (`ShowWindow(SW_SHOW)`) and reset the desktop work area to default. No reboot or explorer restart is required!
+4. The mod automatically shows the taskbar again and restores the work area it saved before hiding. No reboot or explorer restart is required!
 
