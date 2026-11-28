@@ -21,6 +21,12 @@
 [Comparison](#-comparison) •
 [Troubleshooting](docs/TROUBLESHOOTING.md)
 
+<br>
+
+<img src="docs/images/demo.gif" alt="Animated demo: the taskbar stays hidden while a listed app is focused, even when the cursor touches the bottom edge, and comes back when switching to an app that isn't in the list" width="800">
+
+<sub><i>With a listed app focused, the taskbar stays hidden even when the cursor hits the bottom edge. Switch to any other app and it's back.</i></sub>
+
 ---
 
 </div>
